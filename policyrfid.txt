@@ -10,4 +10,6 @@ grant
     permission java.lang.RuntimePermission "loadLibrary.*";
     permission java.lang.RuntimePermission "shutdownHooks";
     permission java.util.PropertyPermission "creme.noblock", "read";
+    permission java.util.PropertyPermission "de.avetana.bluetooth.test.sendForever", "read";
+    permission java.util.PropertyPermission "de.avetana.bluetooth.test.sendPackets", "read";
 };

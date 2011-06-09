@@ -1,4 +1,4 @@
-/**
+package com.sexingtechnologies.rfid.jumparena; /**
  * Created by IntelliJ IDEA.
  * User: david
  * Date: 5/26/11
@@ -6,7 +6,7 @@
  * To change this template use File | Settings | File Templates.
  */
  
-package com.sexingtechnologies.rfid.jumparena;
+//package com.sexingtechnologies.rfid.jumparena;
 
 import de.avetana.bluetooth.connection.JSR82URL;
 import de.avetana.bluetooth.stack.BlueZ;
@@ -43,8 +43,8 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
     private Frame   finderFrame;
     private Button  inquire;
     private Button  remote; // = new Button("Get remote device info")
-    private Button  localAddress, localName, localDevClass, record, property, setLocalDevClass, discoverable, getRFIDS, clearRFIDS, storeRFIDS;
-    private ToggleButton connect;
+    private Button  localAddress, localName, localDevClass, record, property, setLocalDevClass, discoverable, getRFIDS, clearRFIDS;
+    private ToggleButton connect, storeRFIDS;
     private TextArea connectionURL;
     private TextArea btDisplay;
     private Label   protoLabel, inquiryLable, btLable, connectLabel, dummy;
@@ -74,7 +74,10 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
 
   private static final int rfcommPackLen = 100;
 
-    static String[] connectStr = {"Connect", "Disconnect"};
+    static String[] connectStr  = {"Connect", "Disconnect"};
+    static String[] storeStr    = {"Store:ON", "Store:OFF"};
+
+  private MsgBox notConnected = new MsgBox(false, "Not Connected...", "Connection Error");
 
     public void init() {
 
@@ -110,7 +113,9 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
         wandData.setLayout(new GridLayout(1, 3, 5, 5));
         getRFIDS        = new Button("Download");
         clearRFIDS      = new Button("Clear");
-        storeRFIDS      = new Button("Store: ON");
+        storeRFIDS      = new ToggleButton(storeStr);
+        storeRFIDS.addActionListener(storeRFIDS);
+        storeRFIDS.setPrevString(1);
         wandData.add(getRFIDS);
         wandData.add(clearRFIDS);
         wandData.add(storeRFIDS);
@@ -253,6 +258,88 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
            }
            else if (ae.getSource() == connect && connect.getPrevString().equalsIgnoreCase("Disconnect")) {
              closeConnection();
+           } else if (ae.getSource() == storeRFIDS && storeRFIDS.getPrevString().equalsIgnoreCase("Store:ON") &&
+                    protoChoose.getSelectedIndex() == JSR82URL.PROTOCOL_RFCOMM) {
+                byte b[] = new byte[] {(char)'J'}; // Store IDs on
+                int csum = 0;
+                for (int i = 0; i < b.length; i++) {
+                    csum += (int)(b[i] & 0xff);
+                }
+                System.out.println ("Checksum of burst " + (csum % 1024));
+                int count = 0;
+                boolean sendForever = System.getProperty("de.avetana.bluetooth.test.sendForever", "false").equals("true");
+                System.out.println("sendData.sendForever: " + sendForever);
+                int sendTimes = Integer.parseInt(System.getProperty("de.avetana.bluetooth.test.sendPackets", "1"));
+                System.out.println("sendData.sendTimes: " + sendTimes);
+                int countTimes = 0;
+                do {
+                    countTimes++;
+                    os.write(b);
+                    count += b.length;
+                    System.out.println ("Sent " + count + " bytes");
+                } while (sendForever || countTimes < sendTimes);
+                System.out.println ("Wrote " + (int)(b[0] & 0xff));
+           } else if (ae.getSource() == storeRFIDS && storeRFIDS.getPrevString().equalsIgnoreCase("Store:OFF") &&
+                    protoChoose.getSelectedIndex() == JSR82URL.PROTOCOL_RFCOMM) {
+                byte b[] = new byte[] {(char)'I'}; // Store IDs off
+                int csum = 0;
+                for (int i = 0; i < b.length; i++) {
+                    csum += (int)(b[i] & 0xff);
+                }
+                System.out.println ("Checksum of burst " + (csum % 1024));
+                int count = 0;
+                boolean sendForever = System.getProperty("de.avetana.bluetooth.test.sendForever", "false").equals("true");
+                System.out.println("sendData.sendForever: " + sendForever);
+                int sendTimes = Integer.parseInt(System.getProperty("de.avetana.bluetooth.test.sendPackets", "1"));
+                System.out.println("sendData.sendTimes: " + sendTimes);
+                int countTimes = 0;
+                do {
+                    countTimes++;
+                    os.write(b);
+                    count += b.length;
+                    System.out.println ("Sent " + count + " bytes");
+                } while (sendForever || countTimes < sendTimes);
+                System.out.println ("Wrote " + (int)(b[0] & 0xff));
+           } else if (ae.getSource() == getRFIDS ) {
+                byte b[] = new byte[] {(char)'G'}; // download all stored IDs
+                int csum = 0;
+                for (int i = 0; i < b.length; i++) {
+                    csum += (int)(b[i] & 0xff);
+                }
+                System.out.println ("Checksum of burst " + (csum % 1024));
+                int count = 0;
+                boolean sendForever = System.getProperty("de.avetana.bluetooth.test.sendForever", "false").equals("true");
+                System.out.println("sendData.sendForever: " + sendForever);
+                int sendTimes = Integer.parseInt(System.getProperty("de.avetana.bluetooth.test.sendPackets", "1"));
+                System.out.println("sendData.sendTimes: " + sendTimes);
+                int countTimes = 0;
+                do {
+                    countTimes++;
+                    os.write(b);
+                    count += b.length;
+                    System.out.println ("Sent " + count + " bytes");
+                } while (sendForever || countTimes < sendTimes);
+                System.out.println ("Wrote " + (int)(b[0] & 0xff));
+           }  else if (ae.getSource() == clearRFIDS ) {
+                byte b[] = new byte[] {(char)'M'}; // clear memory of all stored IDs
+                int csum = 0;
+                for (int i = 0; i < b.length; i++) {
+                    csum += (int)(b[i] & 0xff);
+                }
+                System.out.println ("Checksum of burst " + (csum % 1024));
+                int count = 0;
+                boolean sendForever = System.getProperty("de.avetana.bluetooth.test.sendForever", "false").equals("true");
+                System.out.println("sendData.sendForever: " + sendForever);
+                int sendTimes = Integer.parseInt(System.getProperty("de.avetana.bluetooth.test.sendPackets", "1"));
+                System.out.println("sendData.sendTimes: " + sendTimes);
+                int countTimes = 0;
+                do {
+                    countTimes++;
+                    os.write(b);
+                    count += b.length;
+                    System.out.println ("Sent " + count + " bytes");
+                } while (sendForever || countTimes < sendTimes);
+                System.out.println ("Wrote " + (int)(b[0] & 0xff));
            }
         } catch (Exception e2) {
                 e2.printStackTrace();
@@ -419,9 +506,9 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
           this.aLabel = aLabel;
       }
 
-      private Frame findParentFrame(){
+      private Frame findParentFrame() {
 
-        Component parent = JumpArena.this.getParent();
+        Component parent = getParent();
          while( parent.getParent() != null )
          {
             parent = parent.getParent();
@@ -445,7 +532,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
               d.dispose();
           } else {
               d = new Dialog(f);
-              d.setModal(false);
+              d.setModal(modality);
               d.setName(name);
               d.setLayout(new FlowLayout());
               d.add(new Label(aLabel));
