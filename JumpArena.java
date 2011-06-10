@@ -9,13 +9,17 @@ package com.sexingtechnologies.rfid.jumparena; /**
 //package com.sexingtechnologies.rfid.jumparena;
 
 import de.avetana.bluetooth.connection.JSR82URL;
+import de.avetana.bluetooth.hci.LinkQuality;
+import de.avetana.bluetooth.hci.Rssi;
 import de.avetana.bluetooth.stack.BlueZ;
+import de.avetana.bluetooth.util.BTAddress;
 import de.avetana.bluetooth.util.IntDeviceFinder;
 import de.avetana.bluetooth.util.ServiceFinderPane;
 
 import javax.bluetooth.DiscoveryAgent;
 import javax.bluetooth.L2CAPConnection;
 import javax.bluetooth.LocalDevice;
+import javax.bluetooth.RemoteDevice;
 import javax.microedition.io.Connection;
 import javax.microedition.io.Connector;
 import javax.microedition.io.StreamConnection;
@@ -25,6 +29,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.awt.im.InputContext;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
@@ -78,6 +84,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
     static String[] storeStr    = {"Store:ON", "Store:OFF"};
 
   private MsgBox notConnected = new MsgBox(false, "Not Connected...", "Connection Error");
+  private OKDialog remoteInfo;
 
     public void init() {
 
@@ -165,7 +172,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
         radioGrp        = new CheckboxGroup();
         lightningRod    = new Checkbox("LightningRod", radioGrp, true);
         rfidServer      = new Checkbox("RFID Server", radioGrp, false);
-        connectionURL   = new TextArea("btspp://", 5, 25, TextArea.SCROLLBARS_VERTICAL_ONLY);
+        connectionURL   = new TextArea("btspp://" + getRemoteDevBTAddress() + ":1", 5, 25, TextArea.SCROLLBARS_VERTICAL_ONLY);
 //        connectPanel.setSize(); work the Dimension class here and the other components.
         connectPanel.add(connectLabel);
         connectPanel.add(lightningRod);
@@ -229,7 +236,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
    public void startInquiry() {
      finderFrame = new Frame("Device Finder");
      try {
-       IntDeviceFinder myFinder=new IntDeviceFinder(finderFrame, true);
+       IntDeviceFinder myFinder = new IntDeviceFinder(finderFrame, false);
        myFinder.setVisible(true);
      }catch(Exception ex) {ex.printStackTrace();}
    }
@@ -274,7 +281,12 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
                 int countTimes = 0;
                 do {
                     countTimes++;
-                    os.write(b);
+                    try {
+                        os.write(b);
+                    } catch (NullPointerException npe) {
+                        npe.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+                        notConnected.actionPerformed(ae);
+                    }
                     count += b.length;
                     System.out.println ("Sent " + count + " bytes");
                 } while (sendForever || countTimes < sendTimes);
@@ -531,16 +543,71 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
               d.setVisible(false);
               d.dispose();
           } else {
-              d = new Dialog(f);
+              d = new Dialog(f, aLabel, false);
               d.setModal(modality);
               d.setName(name);
               d.setLayout(new FlowLayout());
-              d.add(new Label(aLabel));
+//              d.add(new Label(aLabel));
               d.pack();
-              d.setLocation(100,100);
+              d.setLocation(150,150);
               d.setVisible(true);
           }
         }
+      }
+   }
+
+
+   public class YesNoDialog extends Dialog implements ActionListener {
+
+      private Button yes = new Button("Yes");
+      private Button no = new Button("No");
+
+      public YesNoDialog(Frame parent, String message) {
+
+        super(parent, true);
+        this.add(BorderLayout.CENTER, new Label(message));
+        Panel p = new Panel();
+        p.setLayout(new FlowLayout());
+        yes.addActionListener(this);
+        p.add(yes);
+        no.addActionListener(this);
+        p.add(no);
+        this.add(BorderLayout.SOUTH, p);
+        this.setSize(300,100);
+        this.setLocation(100, 200);
+        this.pack();
+
+      }
+
+      public void actionPerformed(ActionEvent evt) {
+        this.setVisible(false);
+        this.dispose();
+      }
+
+   }
+
+   public class OKDialog extends Dialog implements ActionListener {
+
+      private Button ok = new Button("OK");
+
+      public OKDialog(Frame parent, String message) {
+
+        super(parent, true);
+        this.add(BorderLayout.CENTER, new Label(message));
+        Panel p = new Panel();
+        p.setLayout(new FlowLayout());
+        ok.addActionListener(this);
+        p.add(ok);
+        this.add(BorderLayout.SOUTH, p);
+        this.setSize(300,100);
+        this.setLocation(100, 200);
+        this.pack();
+
+      }
+
+      public void actionPerformed(ActionEvent evt) {
+        this.setVisible(false);
+        this.dispose();
       }
    }
 
@@ -554,5 +621,88 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
      m_local=LocalDevice.getLocalDevice();
      m_agent=m_local.getDiscoveryAgent();
    }
+
+    /**
+    * Shows information about the remote device (name, device class, BT address ..etc..)
+    */
+   public void getRemoteDevInfos() {
+   	 RemoteDevice rd = null;
+   	 String name = "unknown";
+   	 int rssi = 0;
+	 int lq = 0;
+   	 try {
+     	rd = RemoteDevice.getRemoteDevice(streamCon);
+		name = rd.getFriendlyName(false);
+		rssi = Rssi.getRssi(rd.getBTAddress());
+		lq = LinkQuality.getLinkQuality(rd.getBTAddress());
+	} catch (Exception e) {
+
+		return;
+	}
+     Frame f = findParentFrame();
+     String remoteInfoStr = "Remote Device Address, Name, Rssi und Quality\n" + rd.getBluetoothAddress() + " " + name + " " + rssi + " " + lq;
+     remoteInfo = new OKDialog(f, remoteInfoStr);
+     remoteInfo.setVisible(true);
+   }
+
+    /**
+    * Shows information about the remote device (name, device class, BT address ..etc..)
+    */
+   public String getRemoteDevName() {
+   	 RemoteDevice rd = null;
+   	 String name = "unknown";
+   	 int rssi = 0;
+	 int lq = 0;
+     Frame f = findParentFrame();
+   	 try {
+     	rd = RemoteDevice.getRemoteDevice(streamCon);
+		name = rd.getFriendlyName(false);
+		rssi = Rssi.getRssi(rd.getBTAddress());
+		lq = LinkQuality.getLinkQuality(rd.getBTAddress());
+	 } catch (Exception e) {
+        remoteInfo = new OKDialog(f, e.getMessage());
+        remoteInfo.setVisible(true);
+		return null;
+	 }
+     return name;
+   }
+
+   /**
+    * Shows information about the remote device (name, device class, BT address ..etc..)
+    */
+   public String getRemoteDevBTAddress() {
+   	 RemoteDevice rd = null;
+     BTAddress btAddress = null;
+   	 String name = "unknown";
+   	 int rssi = 0;
+	 int lq = 0;
+     Frame f = findParentFrame();
+   	 try {
+     	rd = RemoteDevice.getRemoteDevice(streamCon);
+		name = rd.getFriendlyName(false);
+        btAddress = rd.getBTAddress();
+		rssi = Rssi.getRssi(rd.getBTAddress());
+		lq = LinkQuality.getLinkQuality(rd.getBTAddress());
+	 } catch (Exception e) {
+        remoteInfo = new OKDialog(f, e.getMessage());
+        remoteInfo.setVisible(true);
+		return null;
+	 }
+     if(name.indexOf("LightningRod") > 0)
+        return btAddress.toString();
+     else
+        return null;
+   }
+
+    private Frame findParentFrame() {
+
+        Component parent = getParent();
+         while( parent.getParent() != null )
+         {
+            parent = parent.getParent();
+         }
+         Frame topFrame = ( Frame )parent;
+         return topFrame;
+      }
 
 }
