@@ -5,8 +5,7 @@ package com.sexingtechnologies.rfid.jumparena; /**
  * Time: 9:46 AM
  * To change this template use File | Settings | File Templates.
  */
- 
-//package com.sexingtechnologies.rfid.jumparena;
+
 
 import de.avetana.bluetooth.connection.JSR82URL;
 import de.avetana.bluetooth.hci.LinkQuality;
@@ -34,6 +33,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+// InqDevice imports
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Vector;
+
+import javax.bluetooth.*;
+
+import de.avetana.bluetooth.sdp.RemoteServiceRecord;
+import de.avetana.bluetooth.stack.BlueZ;
+import de.avetana.bluetooth.util.MSServiceRecord;
 
 /*<applet
         code="rfid"
@@ -79,12 +89,15 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
   private DStreamThread receiverThread = null;
 
   private static final int rfcommPackLen = 100;
+  private static final int xoffset = 100;
+  private static final int yoffset = 100;
 
-    static String[] connectStr  = {"Connect", "Disconnect"};
-    static String[] storeStr    = {"Store:ON", "Store:OFF"};
+  static String[] connectStr  = {"Connect", "Disconnect"};
+  static String[] storeStr    = {"Store:ON", "Store:OFF"};
 
-  private MsgBox notConnected = new MsgBox(false, "Not Connected...", "Connection Error");
-  private OKDialog remoteInfo;
+//  private MsgBox notConnected = new MsgBox(false, "Not Connected...", "Connection Error");
+  private OKDialog remoteInfo, devNotFound, connectError;
+  String btName;
 
     public void init() {
 
@@ -172,7 +185,8 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
         radioGrp        = new CheckboxGroup();
         lightningRod    = new Checkbox("LightningRod", radioGrp, true);
         rfidServer      = new Checkbox("RFID Server", radioGrp, false);
-        connectionURL   = new TextArea("btspp://" + getRemoteDevBTAddress() + ":1", 5, 25, TextArea.SCROLLBARS_VERTICAL_ONLY);
+
+        connectionURL   = new TextArea("", 5, 25, TextArea.SCROLLBARS_VERTICAL_ONLY);
 //        connectPanel.setSize(); work the Dimension class here and the other components.
         connectPanel.add(connectLabel);
         connectPanel.add(lightningRod);
@@ -188,7 +202,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
         btDevices.setLayout(new GridLayout(0, 1, 5, 5));
         btDevices.setBackground(Color.GREEN);
         btDevices.setVisible(true);
-        btLable = new Label("Bluetooth Devices");
+        btLable = new Label("Local Device");
         btDevices.add(btLable);
         btDisplay       = new TextArea(msg, 8, 25, TextArea.SCROLLBARS_VERTICAL_ONLY);
         btDisplay.setBackground(Color.YELLOW);
@@ -248,7 +262,12 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
                 System.out.println("Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
             }
             if(ae.getSource() == inquire) {
-                startInquiry();
+//                startInquiry();
+                try {
+                    InqDevice inqDevice = new InqDevice(null, null);
+                } catch (Exception e) {
+                    e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+                }
             } else if (ae.getSource() == connect && connect.getPrevString().equalsIgnoreCase("Connect")) {
              System.out.println ("Trying to connect to " + connectionURL.getText() + " " + streamCon);
              streamCon = Connector.open(connectionURL.getText());
@@ -285,7 +304,12 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
                         os.write(b);
                     } catch (NullPointerException npe) {
                         npe.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-                        notConnected.actionPerformed(ae);
+                        Frame f = findParentFrame();
+                        GraphicsConfiguration gc = getGraphicsConfiguration();
+                        Rectangle bounds = gc.getBounds();
+                        String noConnStr = "LightningROD not connected: ";
+                        connectError = new OKDialog(f, noConnStr + npe.getMessage(), xoffset+bounds.x, yoffset+bounds.y);
+                        connectError.setVisible(true);
                     }
                     count += b.length;
                     System.out.println ("Sent " + count + " bytes");
@@ -354,9 +378,13 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
                 System.out.println ("Wrote " + (int)(b[0] & 0xff));
            }
         } catch (Exception e2) {
-                e2.printStackTrace();
-                Button b = new Button("Exception");
-                b.addActionListener(new MsgBox(false, "Exception", e2.getMessage()));
+            e2.printStackTrace();
+            Frame f = findParentFrame();
+            GraphicsConfiguration gc = getGraphicsConfiguration();
+            Rectangle bounds = gc.getBounds();
+            String noDevStr = "LightningROD not found: ";
+            devNotFound = new OKDialog(f, noDevStr + e2.getMessage(), xoffset + bounds.x, xoffset + bounds.y);
+            devNotFound.setVisible(true);
         }
     }
 
@@ -590,7 +618,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
 
       private Button ok = new Button("OK");
 
-      public OKDialog(Frame parent, String message) {
+      public OKDialog(Frame parent, String message, int xoffset, int yoffset) {
 
         super(parent, true);
         this.add(BorderLayout.CENTER, new Label(message));
@@ -600,9 +628,8 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
         p.add(ok);
         this.add(BorderLayout.SOUTH, p);
         this.setSize(300,100);
-        this.setLocation(100, 200);
+        this.setLocation(xoffset, yoffset);
         this.pack();
-
       }
 
       public void actionPerformed(ActionEvent evt) {
@@ -640,8 +667,10 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
 		return;
 	}
      Frame f = findParentFrame();
+     GraphicsConfiguration gc = getGraphicsConfiguration();
+     Rectangle bounds = gc.getBounds();
      String remoteInfoStr = "Remote Device Address, Name, Rssi und Quality\n" + rd.getBluetoothAddress() + " " + name + " " + rssi + " " + lq;
-     remoteInfo = new OKDialog(f, remoteInfoStr);
+     remoteInfo = new OKDialog(f, remoteInfoStr, xoffset + bounds.x, yoffset + bounds.y);
      remoteInfo.setVisible(true);
    }
 
@@ -654,13 +683,15 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
    	 int rssi = 0;
 	 int lq = 0;
      Frame f = findParentFrame();
+     GraphicsConfiguration gc = getGraphicsConfiguration();
+     Rectangle bounds = gc.getBounds();
    	 try {
      	rd = RemoteDevice.getRemoteDevice(streamCon);
 		name = rd.getFriendlyName(false);
 		rssi = Rssi.getRssi(rd.getBTAddress());
 		lq = LinkQuality.getLinkQuality(rd.getBTAddress());
 	 } catch (Exception e) {
-        remoteInfo = new OKDialog(f, e.getMessage());
+        remoteInfo = new OKDialog(f, e.getMessage(), xoffset + bounds.x, yoffset + bounds.y);
         remoteInfo.setVisible(true);
 		return null;
 	 }
@@ -677,6 +708,8 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
    	 int rssi = 0;
 	 int lq = 0;
      Frame f = findParentFrame();
+     GraphicsConfiguration gc = getGraphicsConfiguration();
+     Rectangle bounds = gc.getBounds();
    	 try {
      	rd = RemoteDevice.getRemoteDevice(streamCon);
 		name = rd.getFriendlyName(false);
@@ -684,7 +717,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
 		rssi = Rssi.getRssi(rd.getBTAddress());
 		lq = LinkQuality.getLinkQuality(rd.getBTAddress());
 	 } catch (Exception e) {
-        remoteInfo = new OKDialog(f, e.getMessage());
+        remoteInfo = new OKDialog(f, e.getMessage(), xoffset + bounds.x, yoffset + bounds.y);
         remoteInfo.setVisible(true);
 		return null;
 	 }
@@ -704,5 +737,184 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
          Frame topFrame = ( Frame )parent;
          return topFrame;
       }
+
+    /**
+     *  if the program is called without any parameters, it does an inquiry.
+     *  If it is calles with 1 parameter it does a service serach on the device specified (e.g. 000d9305170e).
+     *  If it is called with 2 parameters, the second parameter is considered a UUID on which the service search
+     *  is supposed to be restricted on
+     */
+
+    public class InqDevice implements DiscoveryListener {
+
+        private static final boolean doException = false;
+        private boolean searchCompleted = false;
+        private Vector devices;
+
+        /* (non-Javadoc)
+         * @see javax.bluetooth.DiscoveryListener#deviceDiscovered(javax.bluetooth.RemoteDevice, javax.bluetooth.DeviceClass)
+         */
+        public void deviceDiscovered(RemoteDevice btDevice, DeviceClass cod) {
+            devices.add(btDevice);
+            try {
+                System.out.println ("device discovered " + btDevice + " name " + btDevice.getFriendlyName(true) + " majc 0x" + Integer.toHexString(cod.getMajorDeviceClass()) + " minc 0x" + Integer.toHexString(cod.getMinorDeviceClass()) + " sc 0x" + Integer.toHexString(cod.getServiceClasses()));
+                if(btDevice.getFriendlyName(true).startsWith("LightningROD")) {
+                    connectionURL.setText("btspp://"+btDevice+":1");
+                    btName = btDevice.getFriendlyName(true);
+                }
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            if (doException) {
+                byte[] b = new byte[0];
+                b[1] = 0;
+            }
+
+        }
+
+        /* (non-Javadoc)
+         * @see javax.bluetooth.DiscoveryListener#servicesDiscovered(int, javax.bluetooth.ServiceRecord[])
+         */
+        public void servicesDiscovered(int transID, ServiceRecord[] servRecord) {
+            // TODO Auto-generated method stub
+            System.out.println (servRecord.length + " services discovered " + transID);
+
+            if (doException) {
+                byte[] b = new byte[0];
+                b[1] = 0;
+            }
+
+            for (int i = 0;i < servRecord.length;i++) {
+                try {
+                    System.out.println ("Record " + (i + 1));
+                    System.out.println ("" + servRecord[i]);
+                    } catch (Exception e) { e.printStackTrace(); }
+                    /*if (servRecord[0] instanceof RemoteServiceRecord) {
+                        RemoteServiceRecord rsr = (RemoteServiceRecord)servRecord[0];
+                        if (rsr.raw.length == 0) return;
+                        for (int j = 0; j < rsr.raw.length;j++) {
+                            System.out.print (" " + Integer.toHexString(rsr.raw[j] & 0xff));
+                        }
+                        System.out.println("\n----------------");
+
+                        ServiceRecord rsr2;
+                        try {
+                            rsr2 = RemoteServiceRecord.createServiceRecord("000000000000", new byte[0][0], new int[] { 0,1,2,3,4,5,6,7,8,9,10, 256 }, rsr.raw);
+                            byte[] raw2 = MSServiceRecord.getByteArray (rsr2);
+                            for (int j = 0; j < raw2.length;j++) {
+                                System.out.print (" " + Integer.toHexString(raw2[j] & 0xff));
+                            }
+                            System.out.println();
+
+                        } catch (IOException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+
+                    }*/
+            }
+
+        }
+
+        /* (non-Javadoc)
+         * @see javax.bluetooth.DiscoveryListener#serviceSearchCompleted(int, int)
+         */
+        public synchronized void serviceSearchCompleted(int transID, int respCode) {
+            // TODO Auto-generated method stub
+            System.out.println ("Service search completed " + transID + " / " + respCode);
+            searchCompleted = true;
+            notifyAll();
+        }
+
+        /* (non-Javadoc)
+         * @see javax.bluetooth.DiscoveryListener#inquiryCompleted(int)
+         */
+        public synchronized void inquiryCompleted(int discType) {
+            System.out.println ("Inquiry completed " + discType);
+            searchCompleted = true;
+            notifyAll();
+            /*try {
+                LocalDevice.getLocalDevice().getDiscoveryAgent().startInquiry(DiscoveryAgent.GIAC, InqDevice.this);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }*/
+
+        }
+
+        public InqDevice(String addr, String uuid) throws Exception {
+            devices = new Vector();
+            System.out.println ("Getting discoveryAgent");
+            DiscoveryAgent da = LocalDevice.getLocalDevice().getDiscoveryAgent();
+
+            if (addr == null) {
+                da.startInquiry(DiscoveryAgent.GIAC, this);
+            } else {
+                UUID uuids[];
+                System.out.println ("Setting up uuids");
+                if (uuid == null) uuids = new UUID[] { };
+                else if (uuid.length() == 32) uuids = new UUID[] { new UUID (uuid, false) };
+                else uuids = new UUID[] { new UUID (uuid, true) };
+                System.out.println ("Starting search");
+                int transID = da.searchServices(new int[] { 0x05, 0x06, 0x07, 0x08, 0x09, 0x100, 0x303 }, uuids, new RemoteDevice (addr), this);
+                System.out.println ("Started " + transID);
+                //BufferedReader br = new BufferedReader (new InputStreamReader (System.in));
+                //br.readLine();
+                //if (!searchCompleted) da.cancelServiceSearch(transID);
+                //System.out.println ("Canceled");
+
+    /*			Thread.currentThread().sleep(100);
+
+                System.out.println ("Interrupting service search " + transID);
+                da.cancelServiceSearch(transID);
+                Thread.currentThread().sleep(1500);
+                System.out.println ("Restarting service search");
+                searchCompleted = false;
+                transID = da.searchServices(new int[] { 0x05, 0x06, 0x07, 0x08, 0x09, 0x100, 0x303 }, uuids, new RemoteDevice ("000E0799107C"), this);
+                */
+            }
+
+                while (!searchCompleted) {
+                    synchronized (this) { wait(100); }
+                }
+    //			BlueZ.authenticate (((RemoteDevice)devices.get(0)).getBluetoothAddress(), "6624");
+                System.out.println("devices: " + devices.toString());
+//                System.exit(0);
+
+        }
+
+        public InqDevice(String addr) throws BluetoothStateException, InterruptedException {
+            devices = new Vector();
+            int loop = 0;
+            DiscoveryAgent da = LocalDevice.getLocalDevice().getDiscoveryAgent();
+            while (true) {
+                System.out.println ("Performing loop " + loop++);
+                searchCompleted = false;
+                devices.clear();
+                if (addr == null || addr.equals("inq")) {
+                    da.startInquiry(DiscoveryAgent.GIAC, this);
+                    synchronized (this) { wait(60000); }
+                    if (!searchCompleted) {
+                        System.out.println ("Cancelling inquiry");
+                        da.cancelInquiry(this);
+                    }
+                    if (("" + addr).equals("inq"))
+                        continue;
+                } else
+                    devices.add(new RemoteDevice (addr));
+                for (int i = 0;i < devices.size();i++) {
+                    RemoteDevice rc = (RemoteDevice) devices.get(i);
+                    searchCompleted = false;
+                    System.out.println ("Searching services on " + rc.getBluetoothAddress());
+                    int transID = da.searchServices(new int[] { 0x05, 0x06, 0x07, 0x08, 0x09, 0x100, 0x303 }, new UUID[0], rc, this);
+                    synchronized (this) { wait(60000); }
+                    if (!searchCompleted) {
+                        System.out.println ("Cancelling service search");
+                        da.cancelServiceSearch(transID);
+                    }
+                }
+            }
+        }
+    }
 
 }
