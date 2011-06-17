@@ -99,7 +99,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
   static String[] storeStr    = {"Store:ON", "Store:OFF"};
 
 //  private MsgBox notConnected = new MsgBox(false, "Not Connected...", "Connection Error");
-  private OKDialog remoteInfo, devNotFound, connectError;
+  private OKDialog remoteInfo, devNotFound, connectError, storeRFIDon, storeRFIDoff;
   private String btName;
 
     public void init() {
@@ -258,7 +258,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
         try {
             System.out.println("Connect Status: " + connect.getPrevString());
             if(receiverThread != null) {
-                System.out.println("Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
+                System.out.println("Connect Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
             }
             if(ae.getSource() == inquire) {
                 try {
@@ -285,7 +285,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
              closeConnection();
            } else if (ae.getSource() == storeRFIDS && storeRFIDS.getPrevString().equalsIgnoreCase("Store:ON") &&
                     protoChoose.getSelectedIndex() == JSR82URL.PROTOCOL_RFCOMM) {
-                                                                                                             System.out.println("Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
+                System.out.println("Command J Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
                 byte b[] = new byte[] {(char)'J'}; // Store IDs off
                 int csum = 0;
                 /*for (int i = 0; i < b.length; i++) {
@@ -301,9 +301,10 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
                 do {
                     countTimes++;
                     synchronized (os) {
+                        System.out.println("J command before synchronized(os) Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
                         os.write(b);
-                        System.out.println("J command bytes received: "+(byte)is.read());
-                        System.out.println("J command Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
+//                        System.out.println("J command bytes received: "+(byte)is.read());
+                        System.out.println("J command after synchronized(os) Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
                     }
 
                     count += b.length;
@@ -329,7 +330,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
                     countTimes++;
                     synchronized (os) {
                         os.write(b);
-                        System.out.println("I command bytes received: "+(byte)is.read());
+//                        System.out.println("I command bytes received: "+(byte)is.read());
                     }
                     count += b.length;
                     System.out.println ("I command sent " + count + " bytes");
@@ -353,7 +354,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
                     countTimes++;
                     synchronized (os) {
                         os.write(b);
-                        System.out.println("G command bytes received: " + is.read());
+//                        System.out.println("G command bytes received: " + is.read());
                         System.out.println("G command Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
                     }
                     count += b.length;
@@ -377,7 +378,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
                     countTimes++;
                     synchronized (os) {
                         os.write(b);
-                        System.out.println("M command bytes received: "+is.read());
+//                        System.out.println("M command bytes received: "+is.read());
                         System.out.println("M command Thread status: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
                     }
                     count += b.length;
@@ -391,7 +392,7 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
             GraphicsConfiguration gc = getGraphicsConfiguration();
             Rectangle bounds = gc.getBounds();
             String noDevStr = "LightningROD not found: ";
-            devNotFound = new OKDialog(f, noDevStr + e2.getMessage(), xoffset + bounds.x, xoffset + bounds.y);
+            devNotFound = new OKDialog(f, noDevStr + e2.getMessage(), xoffset + bounds.x, yoffset + bounds.y);
             devNotFound.setVisible(true);
         }
     }
@@ -404,7 +405,6 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
         clearRFIDS.addActionListener(this);
         storeRFIDS.addActionListener(this);
     }
-
 
     /**
     * Thread used to read data from an RFCOMM connection
@@ -425,6 +425,8 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
        received = 0;
        byte b[] = new byte[rfcommPackLen];
        byte c[] = new byte[rfcommPackLen];
+       byte d[] = new byte[rfcommPackLen];
+       StringBuilder doneStr = new StringBuilder();
        try {
 		 int csum = 0, csumc = 0, a = 0;
          while (running) {
@@ -436,7 +438,9 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
            char c0 = (char)c[0];
            char c1 = (char)c[1];
            System.out.println ("DStreamThread.v1: " + v1 + " v2: " + v2);
-           System.out.println("DStreamThread.c0: " + c0 + " c1: " + c1);
+           if(c0 == 'J')
+               System.out.println("DStreamThread found J command: " + c0);
+//           System.out.println("DStreamThread.c0: " + c0 + " c1: " + c1);
 //           dataReceived.setText("Received " + received);
            System.out.println(" DStreamThread.received: " + received);
            if (is.available() > 0) {
@@ -446,7 +450,6 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
             System.out.println(" DStreamThread.charcount: " + a);
            } else {
                a = 0;
-               System.out.println("DSTreamThread synchronized wait: " + receiverThread.getName() + " State: " + receiverThread.getState() + " Alive: " + receiverThread.isAlive());
         	   try { synchronized (this) { wait(100); }} catch (Exception e) {}
            }
 
@@ -454,9 +457,29 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
                c[i+2] = b[i];
 			   System.out.print (" DStreamThread: " + Integer.toHexString((int)(b[i] & 0xff)));
                System.out.print(" DStreamThread: " + (int)(b[i] & 0xff));
+               if(c0 == 'J' && (b[i] != 13 && b[i] != 10))
+                   doneStr.append((char)b[i]);
                System.out.println(" DStreamThread: " + (char)(b[i]));
 			   csum += (int)(b[i] & 0xff);
 		   }
+
+           String str2 = doneStr.toString();
+           if(c0 == 'J' && str2.equalsIgnoreCase("done")) {
+               System.out.println("DStreamThread.str2 = Done: " + str2);
+               Frame f = findParentFrame();
+               GraphicsConfiguration gc = getGraphicsConfiguration();
+               Rectangle bounds = gc.getBounds();
+               String storeRFIDonStr = "Store RFID: ON";
+               storeRFIDon = new OKDialog(f, storeRFIDonStr, xoffset+bounds.x, yoffset+bounds.y);
+               storeRFIDon.setVisible(true);
+           } else if (c0 == 'I' && str2.equalsIgnoreCase("done")) {
+               Frame f = findParentFrame();
+               GraphicsConfiguration gc = getGraphicsConfiguration();
+               Rectangle bounds = gc.getBounds();
+               String storeRFIDoffStr = "Store RFID: OFF";
+               storeRFIDon = new OKDialog(f, storeRFIDoffStr, xoffset+bounds.x, yoffset+bounds.y);
+               storeRFIDon.setVisible(true);
+           }
            String str = new String(c);
 //           RFID.setText("RFID:" + str);
            System.out.println ();
@@ -479,10 +502,10 @@ public class JumpArena extends Applet implements ItemListener, ActionListener {
      }
    }
 
-   private class getRFIDdata {
+   private class sendCommand {
 
        private boolean countFound = false;
-       private getRFIDdata() {
+       private sendCommand() {
        }
    }
 
