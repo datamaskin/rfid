@@ -1,1 +1,1 @@
-just some placeholder file
+This Java bluetooth applet was created to cover the RFID requirements in the sex-cess project.
